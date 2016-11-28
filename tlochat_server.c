@@ -1,12 +1,14 @@
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <tlo/socket.h>
 #include <unistd.h>
 #include "client_handlers.h"
-#include "tlo/socket.h"
 
 #define PORT "12345"
 #define MAX_NUM_PENDING_CONNECTIONS 10

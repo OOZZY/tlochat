@@ -1,7 +1,7 @@
 #ifndef TLO_SOCKET_H
 #define TLO_SOCKET_H
 
-#include <netdb.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 /*

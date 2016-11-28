@@ -1,9 +1,9 @@
 #include "tlo/socket.h"
 #include <assert.h>
+#include <netdb.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 struct addrinfo *tloGetLocalAddressInfo(const char *portOrService) {

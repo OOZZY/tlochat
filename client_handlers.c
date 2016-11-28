@@ -5,8 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <tlo/darray.h>
+#include <tlo/util.h>
 #include <unistd.h>
-#include "tlo/darray.h"
 
 typedef enum ClientState {
   CLIENT_UNHANDLED,
