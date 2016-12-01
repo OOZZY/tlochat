@@ -46,11 +46,6 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
-  struct timeval tv;
-  tv.tv_sec = NUM_SECONDS_RECEIVE_TIMEOUT;    // Secs Timeout
-  tv.tv_usec = NUM_USECONDS_RECEIVE_TIMEOUT;  // Not init'ing this can cause
-                                              // strange errors
-
   error = listen(serverfd, MAX_NUM_PENDING_CONNECTIONS);
   if (error) {
     close(serverfd);
@@ -76,6 +71,10 @@ int main(void) {
       continue;
     }
 
+    struct timeval tv;
+    tv.tv_sec = NUM_SECONDS_RECEIVE_TIMEOUT;    // Secs Timeout
+    tv.tv_usec = NUM_USECONDS_RECEIVE_TIMEOUT;  // Not init'ing this can cause
+                                                // strange errors
     error = setsockopt(clientfd, SOL_SOCKET, SO_RCVTIMEO, &tv,
                        sizeof(struct timeval));
     if (error) {
