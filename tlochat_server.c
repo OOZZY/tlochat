@@ -40,9 +40,9 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
-  int socketfd = tloGetSocketThenBind(localAddressInfo);
+  int serverfd = tloGetSocketThenBind(localAddressInfo);
   freeaddrinfo(localAddressInfo);
-  if (socketfd == TLO_SOCKET_ERROR) {
+  if (serverfd == TLO_SOCKET_ERROR) {
     exit(EXIT_FAILURE);
   }
 
@@ -51,16 +51,16 @@ int main(void) {
   tv.tv_usec = NUM_USECONDS_RECEIVE_TIMEOUT;  // Not init'ing this can cause
                                               // strange errors
 
-  error = listen(socketfd, MAX_NUM_PENDING_CONNECTIONS);
+  error = listen(serverfd, MAX_NUM_PENDING_CONNECTIONS);
   if (error) {
-    close(socketfd);
+    close(serverfd);
     perror("tlochat server: listen");
     exit(EXIT_FAILURE);
   }
 
   error = clientHandlersInit();
   if (error) {
-    close(socketfd);
+    close(serverfd);
     fprintf(stderr, "tlochat server: clientHandlersAddClient failed\n");
     exit(EXIT_FAILURE);
   }
@@ -70,7 +70,7 @@ int main(void) {
     struct sockaddr_storage clientSocket;
     socklen_t clientSocketLen = sizeof(clientSocket);
     int clientfd =
-        accept(socketfd, (struct sockaddr *)&clientSocket, &clientSocketLen);
+        accept(serverfd, (struct sockaddr *)&clientSocket, &clientSocketLen);
     if (clientfd == -1) {
       perror("tlochat server: accept");
       continue;
@@ -119,7 +119,7 @@ int main(void) {
 
   printf("tlochat server: received sigint\n");
   clientHandlersCleanup();
-  close(socketfd);
+  close(serverfd);
 
   printf("tlochat server: exiting successfully\n");
   exit(EXIT_SUCCESS);
