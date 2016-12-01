@@ -47,9 +47,9 @@ void clientPtrDestruct(void *ptr) {
   *clientPtrPtr = NULL;
 }
 
-static const TloType clientPtr = {.sizeOf = sizeof(Client *),
-                                  .constructCopy = clientPtrConstructCopy,
-                                  .destruct = clientPtrDestruct};
+static const TloType clientPtrType = {.sizeOf = sizeof(Client *),
+                                      .constructCopy = clientPtrConstructCopy,
+                                      .destruct = clientPtrDestruct};
 
 static TloDArray clientPtrs;
 static pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -170,7 +170,7 @@ static void *cleanClients(void *data) {
 
 int clientHandlersInit() {
   printf("tlochat client handlers: initializing client handlers\n");
-  TloError tloError = tloDArrayConstruct(&clientPtrs, &clientPtr, NULL, 0);
+  TloError tloError = tloDArrayConstruct(&clientPtrs, &clientPtrType, NULL, 0);
   if (tloError) {
     fprintf(stderr, "tlochat client handlers: tloDArrayConstruct failed\n");
     return CLIENT_HANDLERS_ERROR;
