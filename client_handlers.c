@@ -62,7 +62,26 @@ pthread_cond_t clientsClosed = PTHREAD_COND_INITIALIZER;
 static pthread_t clientHandlers[NUM_CLIENT_HANDLER_PTHREADS];
 
 #define RECEIVE_BUFFER_SIZE 1024
+#define SEND_BUFFER_SIZE 1024
 static bool continueHandling = true;
+
+static void sendToAllClients(const char *message, int messageLen) {
+  pthread_mutex_lock(&clientsMutex);
+  for (size_t i = 0; i < tloDArrayGetSize(&clientPtrs); ++i) {
+    Client **clientPtrPtr = tloDArrayGetMutableElement(&clientPtrs, i);
+    if ((*clientPtrPtr)->state != CLIENT_CLOSED) {
+      Client *clientPtr = *clientPtrPtr;
+      int numBytesSent = send(clientPtr->fd, message, messageLen, 0);
+      if (numBytesSent == -1) {
+        perror("tlochat client handlers: send");
+        fprintf(stderr,
+                "tlochat client handlers: failed to send message to %s:%u\n",
+                clientPtr->addressString, clientPtr->port);
+      }
+    }
+  }
+  pthread_mutex_unlock(&clientsMutex);
+}
 
 static void *handleClients(void *data) {
   (void)data;
@@ -114,6 +133,11 @@ static void *handleClients(void *data) {
 
       printf("%s:%u: %s", clientPtr->addressString, clientPtr->port,
              receiveBuffer);
+
+      char sendBuffer[SEND_BUFFER_SIZE];
+      snprintf(sendBuffer, SEND_BUFFER_SIZE, "%s:%u: %s",
+               clientPtr->addressString, clientPtr->port, receiveBuffer);
+      sendToAllClients(sendBuffer, strlen(sendBuffer) + 1);
     }
 
     if (clientClosed) {
