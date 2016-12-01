@@ -6,6 +6,8 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 add_subdirectory(tloc)
 include_directories(tloc)
+add_subdirectory(tlocposix)
+include_directories(tlocposix)
 enable_testing()
 
 if ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR
@@ -27,6 +29,5 @@ set(CMAKE_C_FLAGS_DEBUG "${debug_flags}" CACHE STRING
 
 add_definitions(-D_POSIX_C_SOURCE=200809L)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-add_subdirectory(tlo)
 add_executable(tlochat_server client_handlers.c tlochat_server.c)
-target_link_libraries(tlochat_server ${CMAKE_THREAD_LIBS_INIT} tloc tlochat)
+target_link_libraries(tlochat_server ${CMAKE_THREAD_LIBS_INIT} tloc tlocposix)
