@@ -50,13 +50,6 @@ int main(void) {
   tv.tv_sec = NUM_SECONDS_RECEIVE_TIMEOUT;    // Secs Timeout
   tv.tv_usec = NUM_USECONDS_RECEIVE_TIMEOUT;  // Not init'ing this can cause
                                               // strange errors
-  error = setsockopt(socketfd, SOL_SOCKET, SO_RCVTIMEO, &tv,
-                     sizeof(struct timeval));
-  if (error) {
-    close(socketfd);
-    perror("tlochat server: setsockopt");
-    exit(EXIT_FAILURE);
-  }
 
   error = listen(socketfd, MAX_NUM_PENDING_CONNECTIONS);
   if (error) {
@@ -72,15 +65,22 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
-  printf("tlochat server: waiting for connections\n");
-
   while (continueListening) {
+    printf("tlochat server: waiting for connections\n");
     struct sockaddr_storage clientSocket;
     socklen_t clientSocketLen = sizeof(clientSocket);
     int clientfd =
         accept(socketfd, (struct sockaddr *)&clientSocket, &clientSocketLen);
     if (clientfd == -1) {
       perror("tlochat server: accept");
+      continue;
+    }
+
+    error = setsockopt(clientfd, SOL_SOCKET, SO_RCVTIMEO, &tv,
+                       sizeof(struct timeval));
+    if (error) {
+      close(clientfd);
+      perror("tlochat server: setsockopt");
       continue;
     }
 
