@@ -75,7 +75,7 @@ static void sendToAllClients(const char *message, int messageLen) {
       if (numBytesSent == -1) {
         perror("tlochat client handlers: send");
         fprintf(stderr,
-                "tlochat client handlers: failed to send message to %s:%u\n",
+                "tlochat client handlers: failed to send message to %s|%u\n",
                 clientPtr->addressString, clientPtr->port);
       }
     }
@@ -114,35 +114,35 @@ static void *handleClients(void *data) {
     bool clientClosed = false;
 
     while (continueHandling) {
-      // printf("tlochat client handlers: receiving from %s:%u\n",
+      // printf("tlochat client handlers: receiving from %s|%u\n",
       // clientPtr->addressString, clientPtr->port);
       ssize_t numBytesReceived =
           recv(clientPtr->fd, receiveBuffer, RECEIVE_BUFFER_SIZE - 1, 0);
       if (numBytesReceived == 0) {
-        printf("tlochat client handlers: %s:%u closed connection\n",
+        printf("tlochat client handlers: %s|%u closed connection\n",
                clientPtr->addressString, clientPtr->port);
         clientClosed = true;
         break;
       }
       if (numBytesReceived < 0) {
-        // printf("tlochat client handlers: %s:%u timed out\n",
+        // printf("tlochat client handlers: %s|%u timed out\n",
         // clientPtr->addressString, clientPtr->port);
         break;
       }
       receiveBuffer[numBytesReceived] = '\0';
 
-      printf("%s:%u: %s", clientPtr->addressString, clientPtr->port,
+      printf("%s|%u: %s", clientPtr->addressString, clientPtr->port,
              receiveBuffer);
 
       char sendBuffer[SEND_BUFFER_SIZE];
-      snprintf(sendBuffer, SEND_BUFFER_SIZE, "%s:%u: %s",
+      snprintf(sendBuffer, SEND_BUFFER_SIZE, "%s|%u: %s",
                clientPtr->addressString, clientPtr->port, receiveBuffer);
       sendToAllClients(sendBuffer, strlen(sendBuffer) + 1);
     }
 
     if (clientClosed) {
       close(clientPtr->fd);
-      printf("tlochat client handlers: closed connection from %s:%u\n",
+      printf("tlochat client handlers: closed connection from %s|%u\n",
              clientPtr->addressString, clientPtr->port);
       clientPtr->state = CLIENT_CLOSED;
 
@@ -152,7 +152,7 @@ static void *handleClients(void *data) {
       assert(!errno);
       pthread_mutex_unlock(&clientsMutex);
     } else {
-      // printf("tlochat client handlers: defer connection from %s:%u\n",
+      // printf("tlochat client handlers: defer connection from %s|%u\n",
       // clientPtr->addressString, clientPtr->port);
       clientPtr->state = CLIENT_UNHANDLED;
 

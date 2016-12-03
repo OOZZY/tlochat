@@ -90,7 +90,7 @@ int main(void) {
 
     in_port_t clientPort = tloGetPort((struct sockaddr *)&clientSocket);
 
-    printf("tlochat server: got connection from %s:%u\n", clientAddressString,
+    printf("tlochat server: got connection from %s|%u\n", clientAddressString,
            clientPort);
 
     // char receiveBuffer[RECEIVE_BUFFER_SIZE];
@@ -103,11 +103,11 @@ int main(void) {
     //  }
     //  receiveBuffer[numBytesReceived] = '\0';
 
-    //  printf("%s:%u: %s", clientAddressString, clientPort, receiveBuffer);
+    //  printf("%s|%u: %s", clientAddressString, clientPort, receiveBuffer);
     //}
 
     // close(clientfd);
-    // printf("tlochat server: closed connection from %s:%u\n",
+    // printf("tlochat server: closed connection from %s|%u\n",
     // clientAddressString, clientPort);
 
     error = clientHandlersAddClient(clientfd, clientAddressString, clientPort);
