@@ -35,12 +35,12 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
-  struct addrinfo *localAddressInfo = tloGetLocalAddressInfo(PORT);
+  struct addrinfo *localAddressInfo = tloGetBindableWildcardAddress(PORT);
   if (!localAddressInfo) {
     exit(EXIT_FAILURE);
   }
 
-  int serverfd = tloGetSocketThenBind(localAddressInfo);
+  int serverfd = tloGetSocketBoundToReusableAddress(localAddressInfo);
   freeaddrinfo(localAddressInfo);
   if (serverfd == TLO_SOCKET_ERROR) {
     exit(EXIT_FAILURE);
