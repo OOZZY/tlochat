@@ -1,0 +1,6 @@
+[submodule "tloc"]
+	path = tloc
+	url = git@bitbucket.org:OOZZY/tloc.git
+[submodule "tlocposix"]
+	path = tlocposix
+	url = git@bitbucket.org:OOZZY/tlocposix.git
