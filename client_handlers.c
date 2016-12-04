@@ -23,34 +23,6 @@ typedef struct Client {
   ClientState state;
 } Client;
 
-static TloError clientPtrConstructCopy(void *bytes, const void *data) {
-  assert(bytes);
-  assert(data);
-
-  memcpy(bytes, data, sizeof(Client *));
-
-  return TLO_SUCCESS;
-}
-
-void clientPtrDestruct(void *ptr) {
-  Client **clientPtrPtr = ptr;
-
-  if (!clientPtrPtr) {
-    return;
-  }
-
-  if (!*clientPtrPtr) {
-    return;
-  }
-
-  free(*clientPtrPtr);
-  *clientPtrPtr = NULL;
-}
-
-static const TloType clientPtrType = {.sizeOf = sizeof(Client *),
-                                      .constructCopy = clientPtrConstructCopy,
-                                      .destruct = clientPtrDestruct};
-
 static TloDArray clientPtrs;
 static int numUnhandledClients = 0;
 static int numClosedClients = 0;
@@ -222,7 +194,7 @@ static void *cleanClients(void *data) {
 
 int clientHandlersInit() {
   printf("tlochat client handlers: initializing client handlers\n");
-  TloError tloError = tloDArrayConstruct(&clientPtrs, &clientPtrType, NULL, 0);
+  TloError tloError = tloDArrayConstruct(&clientPtrs, &tloPtr, NULL, 0);
   if (tloError) {
     fprintf(stderr, "tlochat client handlers: tloDArrayConstruct failed\n");
     return CLIENT_HANDLERS_ERROR;
@@ -264,7 +236,7 @@ int clientHandlersAddClient(int fd, const char *addressString, in_port_t port) {
   client->state = CLIENT_UNHANDLED;
 
   pthread_mutex_lock(&clientsMutex);
-  TloError tloError = tloDArrayPushBack(&clientPtrs, &client);
+  TloError tloError = tloDArrayMoveBack(&clientPtrs, &client);
   if (!tloError) {
     numUnhandledClients++;
     errno = pthread_cond_signal(&clientsUnhandled);
@@ -274,7 +246,7 @@ int clientHandlersAddClient(int fd, const char *addressString, in_port_t port) {
 
   if (tloError) {
     free(client);
-    fprintf(stderr, "tlochat client handlers: tloDArrayPushBack failed\n");
+    fprintf(stderr, "tlochat client handlers: tloDArrayMoveBack failed\n");
     return CLIENT_HANDLERS_ERROR;
   }
 
