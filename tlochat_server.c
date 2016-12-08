@@ -40,6 +40,9 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
+  printf("tlochat server: binding to one of the following socket addresses:\n");
+  tloPrintAddressInformation(localAddressInfo);
+
   int serverfd = tloGetSocketBoundToReusableAddress(localAddressInfo);
   freeaddrinfo(localAddressInfo);
   if (serverfd == TLO_SOCKET_ERROR) {

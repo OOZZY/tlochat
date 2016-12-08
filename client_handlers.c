@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <tlo/darray.h>
+#include <tlo/thread.h>
 #include <tlo/util.h>
 #include <unistd.h>
 
@@ -139,16 +140,6 @@ static void *handleClients(void *data) {
   pthread_exit(NULL);
 }
 
-static void cancelPthreads(pthread_t *pthreads, int numPthreads) {
-  for (int i = 0; i < numPthreads; ++i) {
-    errno = pthread_cancel(pthreads[i]);
-    if (errno) {
-      perror("tlochat client handlers: pthread_cancel");
-    }
-    assert(!errno);
-  }
-}
-
 #define NUM_CLIENT_CLEANER_PTHREADS 1
 static pthread_t clientCleaner;
 
@@ -200,23 +191,20 @@ int clientHandlersInit() {
     return CLIENT_HANDLERS_ERROR;
   }
 
-  for (int i = 0; i < NUM_CLIENT_HANDLER_PTHREADS; ++i) {
-    errno = pthread_create(&clientHandlers[i], DEFAULT_ATTRIBUTES,
-                           handleClients, NO_ARGS);
-    if (errno) {
-      cancelPthreads(clientHandlers, i);
-      tloDArrayDestruct(&clientPtrs);
-      perror("tlochat client handlers: pthread_create");
-      return CLIENT_HANDLERS_ERROR;
-    }
+  int error = tloCreateThreads(clientHandlers, NUM_CLIENT_HANDLER_PTHREADS,
+                               handleClients, TLO_NO_ARGUMENT);
+  if (error) {
+    tloDArrayDestruct(&clientPtrs);
+    perror("tlochat client handlers: tloCreateThreads");
+    return CLIENT_HANDLERS_ERROR;
   }
 
-  errno =
-      pthread_create(&clientCleaner, DEFAULT_ATTRIBUTES, cleanClients, NO_ARGS);
-  if (errno) {
-    cancelPthreads(clientHandlers, NUM_CLIENT_HANDLER_PTHREADS);
+  error = tloCreateThreads(&clientCleaner, NUM_CLIENT_CLEANER_PTHREADS,
+                           cleanClients, TLO_NO_ARGUMENT);
+  if (error) {
+    tloCancelThreads(clientHandlers, NUM_CLIENT_HANDLER_PTHREADS);
     tloDArrayDestruct(&clientPtrs);
-    perror("tlochat client handlers: pthread_create");
+    perror("tlochat client handlers: tloCreateThreads");
     return CLIENT_HANDLERS_ERROR;
   }
 
@@ -253,16 +241,6 @@ int clientHandlersAddClient(int fd, const char *addressString, in_port_t port) {
   return CLIENT_HANDLERS_SUCCESS;
 }
 
-static void joinPthreads(pthread_t *pthreads, int numPthreads) {
-  for (int i = 0; i < numPthreads; ++i) {
-    errno = pthread_join(pthreads[i], IGNORE_OUT_ARG);
-    if (errno) {
-      perror("tlochat client handlers: pthread_join");
-    }
-    assert(!errno);
-  }
-}
-
 void clientHandlersCleanup() {
   printf("tlochat client handlers: cleaning up client handlers\n");
   continueHandling = false;
@@ -273,7 +251,7 @@ void clientHandlersCleanup() {
   errno = pthread_cond_broadcast(&clientsClosed);
   assert(!errno);
 
-  joinPthreads(&clientCleaner, NUM_CLIENT_CLEANER_PTHREADS);
-  joinPthreads(clientHandlers, NUM_CLIENT_HANDLER_PTHREADS);
+  tloJoinThreads(&clientCleaner, NUM_CLIENT_CLEANER_PTHREADS);
+  tloJoinThreads(clientHandlers, NUM_CLIENT_HANDLER_PTHREADS);
   tloDArrayDestruct(&clientPtrs);
 }
