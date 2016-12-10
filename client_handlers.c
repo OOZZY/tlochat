@@ -141,18 +141,12 @@ static void *handleClients(void *data) {
   pthread_exit(NULL);
 }
 
-#define NUM_SECONDS_TO_SLEEP 10
-#define NUM_NSECONDS_TO_SLEEP 0
 #define IGNORE_OUT_ARG NULL
 
 static void *cleanClients(void *data) {
   (void)data;
 
   while (continueHandling) {
-    const struct timespec interval = {NUM_SECONDS_TO_SLEEP,
-                                      NUM_NSECONDS_TO_SLEEP};
-    nanosleep(&interval, IGNORE_OUT_ARG);
-
     pthread_mutex_lock(&clientsMutex);
     while (continueHandling && numClosedClients == 0) {
       errno = pthread_cond_wait(&clientsClosed, &clientsMutex);
