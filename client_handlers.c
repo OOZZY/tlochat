@@ -45,7 +45,7 @@ static void sendToAllClients(const char *message, int messageLen) {
     Client **clientPtrPtr = tloDArrayGetMutableElement(&clientPtrs, i);
     if ((*clientPtrPtr)->state != CLIENT_CLOSED) {
       Client *clientPtr = *clientPtrPtr;
-      int numBytesSent = send(clientPtr->fd, message, messageLen, 0);
+      int numBytesSent = send(clientPtr->fd, message, messageLen, MSG_NOSIGNAL);
       if (numBytesSent == -1) {
         perror("tlochat client handlers: send");
         fprintf(stderr,
