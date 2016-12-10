@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <tlo/darray.h>
 #include <tlo/thread.h>
 #include <tlo/util.h>
 #include <unistd.h>
@@ -24,25 +23,14 @@ typedef struct Client {
   ClientState state;
 } Client;
 
-static TloDArray clientPtrs;
-static int numUnhandledClients = 0;
-static int numClosedClients = 0;
-static pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t clientsUnhandled = PTHREAD_COND_INITIALIZER;
-pthread_cond_t clientsClosed = PTHREAD_COND_INITIALIZER;
-#define NUM_CLIENT_HANDLER_PTHREADS 4
-static pthread_t clientHandlers[NUM_CLIENT_HANDLER_PTHREADS];
-#define NUM_CLIENT_CLEANER_PTHREADS 1
-static pthread_t clientCleaner;
-static bool continueHandling = true;
-
 #define RECEIVE_BUFFER_SIZE 1024
 #define SEND_BUFFER_SIZE 1024
 
-static void sendToAllClients(const char *message, int messageLen) {
-  pthread_mutex_lock(&clientsMutex);
-  for (size_t i = 0; i < tloDArrayGetSize(&clientPtrs); ++i) {
-    Client **clientPtrPtr = tloDArrayGetMutableElement(&clientPtrs, i);
+static void sendToAllClients(ClientHandler *handler, const char *message,
+                             int messageLen) {
+  pthread_mutex_lock(&handler->clientsMutex);
+  for (size_t i = 0; i < tloDArrayGetSize(&handler->clientPtrs); ++i) {
+    Client **clientPtrPtr = tloDArrayGetMutableElement(&handler->clientPtrs, i);
     if ((*clientPtrPtr)->state != CLIENT_CLOSED) {
       Client *clientPtr = *clientPtrPtr;
       int numBytesSent = send(clientPtr->fd, message, messageLen, MSG_NOSIGNAL);
@@ -54,31 +42,33 @@ static void sendToAllClients(const char *message, int messageLen) {
       }
     }
   }
-  pthread_mutex_unlock(&clientsMutex);
+  pthread_mutex_unlock(&handler->clientsMutex);
 }
 
 static void *handleClients(void *data) {
-  (void)data;
+  ClientHandler *handler = data;
 
-  while (continueHandling) {
+  while (handler->continueHandling) {
     Client *clientPtr = NULL;
 
-    pthread_mutex_lock(&clientsMutex);
-    while (continueHandling && numUnhandledClients == 0) {
-      errno = pthread_cond_wait(&clientsUnhandled, &clientsMutex);
+    pthread_mutex_lock(&handler->clientsMutex);
+    while (handler->continueHandling && handler->numUnhandledClients == 0) {
+      errno =
+          pthread_cond_wait(&handler->clientsUnhandled, &handler->clientsMutex);
       assert(!errno);
     }
 
-    for (size_t i = 0; i < tloDArrayGetSize(&clientPtrs); ++i) {
-      Client **clientPtrPtr = tloDArrayGetMutableElement(&clientPtrs, i);
+    for (size_t i = 0; i < tloDArrayGetSize(&handler->clientPtrs); ++i) {
+      Client **clientPtrPtr =
+          tloDArrayGetMutableElement(&handler->clientPtrs, i);
       if ((*clientPtrPtr)->state == CLIENT_UNHANDLED) {
         (*clientPtrPtr)->state = CLIENT_BEING_HANDLED;
         clientPtr = *clientPtrPtr;
-        numUnhandledClients--;
+        handler->numUnhandledClients--;
         break;
       }
     }
-    pthread_mutex_unlock(&clientsMutex);
+    pthread_mutex_unlock(&handler->clientsMutex);
 
     if (!clientPtr) {
       continue;
@@ -87,7 +77,7 @@ static void *handleClients(void *data) {
     char receiveBuffer[RECEIVE_BUFFER_SIZE];
     bool clientClosed = false;
 
-    while (continueHandling) {
+    while (handler->continueHandling) {
       // printf("tlochat client handlers: receiving from %s|%u\n",
       // clientPtr->addressString, clientPtr->port);
       ssize_t numBytesReceived =
@@ -111,7 +101,7 @@ static void *handleClients(void *data) {
       char sendBuffer[SEND_BUFFER_SIZE];
       snprintf(sendBuffer, SEND_BUFFER_SIZE, "%s|%u: %s",
                clientPtr->addressString, clientPtr->port, receiveBuffer);
-      sendToAllClients(sendBuffer, strlen(sendBuffer) + 1);
+      sendToAllClients(handler, sendBuffer, strlen(sendBuffer) + 1);
     }
 
     if (clientClosed) {
@@ -120,21 +110,21 @@ static void *handleClients(void *data) {
              clientPtr->addressString, clientPtr->port);
       clientPtr->state = CLIENT_CLOSED;
 
-      pthread_mutex_lock(&clientsMutex);
-      numClosedClients++;
-      errno = pthread_cond_signal(&clientsClosed);
+      pthread_mutex_lock(&handler->clientsMutex);
+      handler->numClosedClients++;
+      errno = pthread_cond_signal(&handler->clientsClosed);
       assert(!errno);
-      pthread_mutex_unlock(&clientsMutex);
+      pthread_mutex_unlock(&handler->clientsMutex);
     } else {
       // printf("tlochat client handlers: defer connection from %s|%u\n",
       // clientPtr->addressString, clientPtr->port);
       clientPtr->state = CLIENT_UNHANDLED;
 
-      pthread_mutex_lock(&clientsMutex);
-      numUnhandledClients++;
-      errno = pthread_cond_signal(&clientsUnhandled);
+      pthread_mutex_lock(&handler->clientsMutex);
+      handler->numUnhandledClients++;
+      errno = pthread_cond_signal(&handler->clientsUnhandled);
       assert(!errno);
-      pthread_mutex_unlock(&clientsMutex);
+      pthread_mutex_unlock(&handler->clientsMutex);
     }
   }
 
@@ -144,29 +134,31 @@ static void *handleClients(void *data) {
 #define IGNORE_OUT_ARG NULL
 
 static void *cleanClients(void *data) {
-  (void)data;
+  ClientHandler *handler = data;
 
-  while (continueHandling) {
-    pthread_mutex_lock(&clientsMutex);
-    while (continueHandling && numClosedClients == 0) {
-      errno = pthread_cond_wait(&clientsClosed, &clientsMutex);
+  while (handler->continueHandling) {
+    pthread_mutex_lock(&handler->clientsMutex);
+    while (handler->continueHandling && handler->numClosedClients == 0) {
+      errno =
+          pthread_cond_wait(&handler->clientsClosed, &handler->clientsMutex);
       assert(!errno);
     }
 
     printf("tlochat client handlers: %zu clients\n",
-           tloDArrayGetSize(&clientPtrs));
+           tloDArrayGetSize(&handler->clientPtrs));
     printf("tlochat client handlers: cleaning up clients\n");
-    for (size_t i = 0; i < tloDArrayGetSize(&clientPtrs); ++i) {
-      Client **clientPtrPtr = tloDArrayGetMutableElement(&clientPtrs, i);
+    for (size_t i = 0; i < tloDArrayGetSize(&handler->clientPtrs); ++i) {
+      Client **clientPtrPtr =
+          tloDArrayGetMutableElement(&handler->clientPtrs, i);
       if ((*clientPtrPtr)->state == CLIENT_CLOSED) {
-        tloDArrayUnorderedRemove(&clientPtrs, i);
+        tloDArrayUnorderedRemove(&handler->clientPtrs, i);
         i--;
-        numClosedClients--;
+        handler->numClosedClients--;
       }
     }
     printf("tlochat client handlers: %zu clients\n",
-           tloDArrayGetSize(&clientPtrs));
-    pthread_mutex_unlock(&clientsMutex);
+           tloDArrayGetSize(&handler->clientPtrs));
+    pthread_mutex_unlock(&handler->clientsMutex);
   }
 
   pthread_exit(NULL);
@@ -175,27 +167,38 @@ static void *cleanClients(void *data) {
 #define DEFAULT_ATTRIBUTES NULL
 #define NO_ARGS NULL
 
-int clientHandlersInit() {
+int clientHandlersInit(ClientHandler *handler) {
+  assert(handler);
+
+  handler->numUnhandledClients = 0;
+  handler->numClosedClients = 0;
+  handler->clientsMutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+  handler->clientsUnhandled = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+  handler->clientsClosed = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
+  handler->continueHandling = true;
+
   printf("tlochat client handlers: initializing client handlers\n");
-  TloError tloError = tloDArrayConstruct(&clientPtrs, &tloPtr, NULL, 0);
+  TloError tloError =
+      tloDArrayConstruct(&handler->clientPtrs, &tloPtr, NULL, 0);
   if (tloError) {
     fprintf(stderr, "tlochat client handlers: tloDArrayConstruct failed\n");
     return CLIENT_HANDLERS_ERROR;
   }
 
-  int error = tloCreateThreads(clientHandlers, NUM_CLIENT_HANDLER_PTHREADS,
-                               handleClients, TLO_NO_ARGUMENT);
+  int error =
+      tloCreateThreads(handler->clientHandlers, NUM_CLIENT_HANDLER_PTHREADS,
+                       handleClients, handler);
   if (error) {
-    tloDArrayDestruct(&clientPtrs);
+    tloDArrayDestruct(&handler->clientPtrs);
     perror("tlochat client handlers: tloCreateThreads");
     return CLIENT_HANDLERS_ERROR;
   }
 
-  error = tloCreateThreads(&clientCleaner, NUM_CLIENT_CLEANER_PTHREADS,
-                           cleanClients, TLO_NO_ARGUMENT);
+  error = tloCreateThreads(&handler->clientCleaner, NUM_CLIENT_CLEANER_PTHREADS,
+                           cleanClients, handler);
   if (error) {
-    tloCancelThreads(clientHandlers, NUM_CLIENT_HANDLER_PTHREADS);
-    tloDArrayDestruct(&clientPtrs);
+    tloCancelThreads(handler->clientHandlers, NUM_CLIENT_HANDLER_PTHREADS);
+    tloDArrayDestruct(&handler->clientPtrs);
     perror("tlochat client handlers: tloCreateThreads");
     return CLIENT_HANDLERS_ERROR;
   }
@@ -203,7 +206,10 @@ int clientHandlersInit() {
   return CLIENT_HANDLERS_SUCCESS;
 }
 
-int clientHandlersAddClient(int fd, const char *addressString, in_port_t port) {
+int clientHandlersAddClient(ClientHandler *handler, int fd,
+                            const char *addressString, in_port_t port) {
+  assert(handler);
+
   Client *client = malloc(sizeof(Client));
   if (!client) {
     perror("tlochat client handlers: malloc");
@@ -215,14 +221,14 @@ int clientHandlersAddClient(int fd, const char *addressString, in_port_t port) {
   client->port = port;
   client->state = CLIENT_UNHANDLED;
 
-  pthread_mutex_lock(&clientsMutex);
-  TloError tloError = tloDArrayMoveBack(&clientPtrs, &client);
+  pthread_mutex_lock(&handler->clientsMutex);
+  TloError tloError = tloDArrayMoveBack(&handler->clientPtrs, &client);
   if (!tloError) {
-    numUnhandledClients++;
-    errno = pthread_cond_signal(&clientsUnhandled);
+    handler->numUnhandledClients++;
+    errno = pthread_cond_signal(&handler->clientsUnhandled);
     assert(!errno);
   }
-  pthread_mutex_unlock(&clientsMutex);
+  pthread_mutex_unlock(&handler->clientsMutex);
 
   if (tloError) {
     free(client);
@@ -233,24 +239,26 @@ int clientHandlersAddClient(int fd, const char *addressString, in_port_t port) {
   return CLIENT_HANDLERS_SUCCESS;
 }
 
-void clientHandlersCleanup() {
+void clientHandlersCleanup(ClientHandler *handler) {
+  assert(handler);
+
   printf("tlochat client handlers: cleaning up client handlers\n");
-  continueHandling = false;
+  handler->continueHandling = false;
 
   // stop all threads from waiting
-  errno = pthread_cond_broadcast(&clientsUnhandled);
+  errno = pthread_cond_broadcast(&handler->clientsUnhandled);
   assert(!errno);
-  errno = pthread_cond_broadcast(&clientsClosed);
+  errno = pthread_cond_broadcast(&handler->clientsClosed);
   assert(!errno);
 
-  tloJoinThreads(&clientCleaner, NUM_CLIENT_CLEANER_PTHREADS);
-  tloJoinThreads(clientHandlers, NUM_CLIENT_HANDLER_PTHREADS);
-  tloDArrayDestruct(&clientPtrs);
+  tloJoinThreads(&handler->clientCleaner, NUM_CLIENT_CLEANER_PTHREADS);
+  tloJoinThreads(handler->clientHandlers, NUM_CLIENT_HANDLER_PTHREADS);
+  tloDArrayDestruct(&handler->clientPtrs);
 
-  errno = pthread_mutex_destroy(&clientsMutex);
+  errno = pthread_mutex_destroy(&handler->clientsMutex);
   assert(!errno);
-  errno = pthread_cond_destroy(&clientsUnhandled);
+  errno = pthread_cond_destroy(&handler->clientsUnhandled);
   assert(!errno);
-  errno = pthread_cond_destroy(&clientsClosed);
+  errno = pthread_cond_destroy(&handler->clientsClosed);
   assert(!errno);
 }

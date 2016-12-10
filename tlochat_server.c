@@ -56,7 +56,8 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
-  error = clientHandlersInit();
+  ClientHandler handler;
+  error = clientHandlersInit(&handler);
   if (error) {
     close(serverfd);
     fprintf(stderr, "tlochat server: clientHandlersAddClient failed\n");
@@ -113,14 +114,15 @@ int main(void) {
     // printf("tlochat server: closed connection from %s|%u\n",
     // clientAddressString, clientPort);
 
-    error = clientHandlersAddClient(clientfd, clientAddressString, clientPort);
+    error = clientHandlersAddClient(&handler, clientfd, clientAddressString,
+                                    clientPort);
     if (error) {
       fprintf(stderr, "tlochat server: clientHandlersAddClient failed\n");
     }
   }
 
   printf("tlochat server: received sigint\n");
-  clientHandlersCleanup();
+  clientHandlersCleanup(&handler);
   close(serverfd);
 
   printf("tlochat server: exiting successfully\n");
