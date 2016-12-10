@@ -30,13 +30,14 @@ static int numClosedClients = 0;
 static pthread_mutex_t clientsMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t clientsUnhandled = PTHREAD_COND_INITIALIZER;
 pthread_cond_t clientsClosed = PTHREAD_COND_INITIALIZER;
-
 #define NUM_CLIENT_HANDLER_PTHREADS 4
 static pthread_t clientHandlers[NUM_CLIENT_HANDLER_PTHREADS];
+#define NUM_CLIENT_CLEANER_PTHREADS 1
+static pthread_t clientCleaner;
+static bool continueHandling = true;
 
 #define RECEIVE_BUFFER_SIZE 1024
 #define SEND_BUFFER_SIZE 1024
-static bool continueHandling = true;
 
 static void sendToAllClients(const char *message, int messageLen) {
   pthread_mutex_lock(&clientsMutex);
@@ -139,9 +140,6 @@ static void *handleClients(void *data) {
 
   pthread_exit(NULL);
 }
-
-#define NUM_CLIENT_CLEANER_PTHREADS 1
-static pthread_t clientCleaner;
 
 #define NUM_SECONDS_TO_SLEEP 10
 #define NUM_NSECONDS_TO_SLEEP 0
