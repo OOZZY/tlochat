@@ -60,7 +60,7 @@ int main(void) {
   error = clientHandlersInit(&handler);
   if (error) {
     close(serverfd);
-    fprintf(stderr, "tlochat server: clientHandlersAddClient failed\n");
+    fprintf(stderr, "tlochat server: clientHandlersInit failed\n");
     exit(EXIT_FAILURE);
   }
 
