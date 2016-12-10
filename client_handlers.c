@@ -252,4 +252,11 @@ void clientHandlersCleanup() {
   tloJoinThreads(&clientCleaner, NUM_CLIENT_CLEANER_PTHREADS);
   tloJoinThreads(clientHandlers, NUM_CLIENT_HANDLER_PTHREADS);
   tloDArrayDestruct(&clientPtrs);
+
+  errno = pthread_mutex_destroy(&clientsMutex);
+  assert(!errno);
+  errno = pthread_cond_destroy(&clientsUnhandled);
+  assert(!errno);
+  errno = pthread_cond_destroy(&clientsClosed);
+  assert(!errno);
 }
