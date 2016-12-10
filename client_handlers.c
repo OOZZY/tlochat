@@ -10,6 +10,8 @@
 #include <tlo/util.h>
 #include <unistd.h>
 
+#define MSG_PREFIX "tlochat client handlers: "
+
 typedef enum ClientState {
   CLIENT_UNHANDLED,
   CLIENT_BEING_HANDLED,
@@ -35,9 +37,8 @@ static void sendToAllClients(ClientHandler *handler, const char *message,
       Client *clientPtr = *clientPtrPtr;
       int numBytesSent = send(clientPtr->fd, message, messageLen, MSG_NOSIGNAL);
       if (numBytesSent == -1) {
-        perror("tlochat client handlers: send");
-        fprintf(stderr,
-                "tlochat client handlers: failed to send message to %s|%u\n",
+        perror(MSG_PREFIX "send");
+        fprintf(stderr, MSG_PREFIX "failed to send message to %s|%u\n",
                 clientPtr->addressString, clientPtr->port);
       }
     }
@@ -78,18 +79,18 @@ static void *handleClients(void *data) {
     bool clientClosed = false;
 
     while (handler->continueHandling) {
-      // printf("tlochat client handlers: receiving from %s|%u\n",
+      // printf(MSG_PREFIX "receiving from %s|%u\n",
       // clientPtr->addressString, clientPtr->port);
       ssize_t numBytesReceived =
           recv(clientPtr->fd, receiveBuffer, RECEIVE_BUFFER_SIZE - 1, 0);
       if (numBytesReceived == 0) {
-        printf("tlochat client handlers: %s|%u closed connection\n",
-               clientPtr->addressString, clientPtr->port);
+        printf(MSG_PREFIX "%s|%u closed connection\n", clientPtr->addressString,
+               clientPtr->port);
         clientClosed = true;
         break;
       }
       if (numBytesReceived < 0) {
-        // printf("tlochat client handlers: %s|%u timed out\n",
+        // printf(MSG_PREFIX "%s|%u timed out\n",
         // clientPtr->addressString, clientPtr->port);
         break;
       }
@@ -106,7 +107,7 @@ static void *handleClients(void *data) {
 
     if (clientClosed) {
       close(clientPtr->fd);
-      printf("tlochat client handlers: closed connection from %s|%u\n",
+      printf(MSG_PREFIX "closed connection from %s|%u\n",
              clientPtr->addressString, clientPtr->port);
       clientPtr->state = CLIENT_CLOSED;
 
@@ -116,7 +117,7 @@ static void *handleClients(void *data) {
       assert(!errno);
       pthread_mutex_unlock(&handler->clientsMutex);
     } else {
-      // printf("tlochat client handlers: defer connection from %s|%u\n",
+      // printf(MSG_PREFIX "defer connection from %s|%u\n",
       // clientPtr->addressString, clientPtr->port);
       clientPtr->state = CLIENT_UNHANDLED;
 
@@ -144,9 +145,8 @@ static void *cleanClients(void *data) {
       assert(!errno);
     }
 
-    printf("tlochat client handlers: %zu clients\n",
-           tloDArrayGetSize(&handler->clientPtrs));
-    printf("tlochat client handlers: cleaning up clients\n");
+    printf(MSG_PREFIX "%zu clients\n", tloDArrayGetSize(&handler->clientPtrs));
+    printf(MSG_PREFIX "cleaning up clients\n");
     for (size_t i = 0; i < tloDArrayGetSize(&handler->clientPtrs); ++i) {
       Client **clientPtrPtr =
           tloDArrayGetMutableElement(&handler->clientPtrs, i);
@@ -156,8 +156,7 @@ static void *cleanClients(void *data) {
         handler->numClosedClients--;
       }
     }
-    printf("tlochat client handlers: %zu clients\n",
-           tloDArrayGetSize(&handler->clientPtrs));
+    printf(MSG_PREFIX "%zu clients\n", tloDArrayGetSize(&handler->clientPtrs));
     pthread_mutex_unlock(&handler->clientsMutex);
   }
 
@@ -177,11 +176,11 @@ int clientHandlersInit(ClientHandler *handler) {
   handler->clientsClosed = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
   handler->continueHandling = true;
 
-  printf("tlochat client handlers: initializing client handlers\n");
+  printf(MSG_PREFIX "initializing client handlers\n");
   TloError tloError =
       tloDArrayConstruct(&handler->clientPtrs, &tloPtr, NULL, 0);
   if (tloError) {
-    fprintf(stderr, "tlochat client handlers: tloDArrayConstruct failed\n");
+    fprintf(stderr, MSG_PREFIX "tloDArrayConstruct failed\n");
     return CLIENT_HANDLERS_ERROR;
   }
 
@@ -190,7 +189,7 @@ int clientHandlersInit(ClientHandler *handler) {
                        handleClients, handler);
   if (error) {
     tloDArrayDestruct(&handler->clientPtrs);
-    perror("tlochat client handlers: tloCreateThreads");
+    perror(MSG_PREFIX "tloCreateThreads");
     return CLIENT_HANDLERS_ERROR;
   }
 
@@ -199,7 +198,7 @@ int clientHandlersInit(ClientHandler *handler) {
   if (error) {
     tloCancelThreads(handler->clientHandlers, NUM_CLIENT_HANDLER_PTHREADS);
     tloDArrayDestruct(&handler->clientPtrs);
-    perror("tlochat client handlers: tloCreateThreads");
+    perror(MSG_PREFIX "tloCreateThreads");
     return CLIENT_HANDLERS_ERROR;
   }
 
@@ -212,7 +211,7 @@ int clientHandlersAddClient(ClientHandler *handler, int fd,
 
   Client *client = malloc(sizeof(Client));
   if (!client) {
-    perror("tlochat client handlers: malloc");
+    perror(MSG_PREFIX "malloc");
     return CLIENT_HANDLERS_ERROR;
   }
 
@@ -232,7 +231,7 @@ int clientHandlersAddClient(ClientHandler *handler, int fd,
 
   if (tloError) {
     free(client);
-    fprintf(stderr, "tlochat client handlers: tloDArrayMoveBack failed\n");
+    fprintf(stderr, MSG_PREFIX "tloDArrayMoveBack failed\n");
     return CLIENT_HANDLERS_ERROR;
   }
 
@@ -242,7 +241,7 @@ int clientHandlersAddClient(ClientHandler *handler, int fd,
 void clientHandlersCleanup(ClientHandler *handler) {
   assert(handler);
 
-  printf("tlochat client handlers: cleaning up client handlers\n");
+  printf(MSG_PREFIX "cleaning up client handlers\n");
   handler->continueHandling = false;
 
   // stop all threads from waiting

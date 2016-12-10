@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include "client_handlers.h"
 
+#define MSG_PREFIX "tlochat server: "
 #define PORT "12345"
 #define MAX_NUM_PENDING_CONNECTIONS 10
 //#define RECEIVE_BUFFER_SIZE 1024
@@ -31,7 +32,7 @@ int main(void) {
   sa.sa_flags = 0;
   int error = sigaction(SIGINT, &sa, NULL);
   if (error) {
-    perror("tlochat server: sigaction");
+    perror(MSG_PREFIX "sigaction");
     exit(EXIT_FAILURE);
   }
 
@@ -40,7 +41,7 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
-  printf("tlochat server: binding to one of the following socket addresses:\n");
+  printf(MSG_PREFIX "binding to one of the following socket addresses:\n");
   tloPrintAddressInformation(localAddressInfo);
 
   int serverfd = tloGetSocketBoundToReusableAddress(localAddressInfo);
@@ -52,7 +53,7 @@ int main(void) {
   error = listen(serverfd, MAX_NUM_PENDING_CONNECTIONS);
   if (error) {
     close(serverfd);
-    perror("tlochat server: listen");
+    perror(MSG_PREFIX "listen");
     exit(EXIT_FAILURE);
   }
 
@@ -60,18 +61,18 @@ int main(void) {
   error = clientHandlersInit(&handler);
   if (error) {
     close(serverfd);
-    fprintf(stderr, "tlochat server: clientHandlersInit failed\n");
+    fprintf(stderr, MSG_PREFIX "clientHandlersInit failed\n");
     exit(EXIT_FAILURE);
   }
 
   while (continueListening) {
-    printf("tlochat server: waiting for connections\n");
+    printf(MSG_PREFIX "waiting for connections\n");
     struct sockaddr_storage clientSocket;
     socklen_t clientSocketLen = sizeof(clientSocket);
     int clientfd =
         accept(serverfd, (struct sockaddr *)&clientSocket, &clientSocketLen);
     if (clientfd == -1) {
-      perror("tlochat server: accept");
+      perror(MSG_PREFIX "accept");
       continue;
     }
 
@@ -83,7 +84,7 @@ int main(void) {
                        sizeof(struct timeval));
     if (error) {
       close(clientfd);
-      perror("tlochat server: setsockopt");
+      perror(MSG_PREFIX "setsockopt");
       continue;
     }
 
@@ -94,7 +95,7 @@ int main(void) {
 
     in_port_t clientPort = tloGetPort((struct sockaddr *)&clientSocket);
 
-    printf("tlochat server: got connection from %s|%u\n", clientAddressString,
+    printf(MSG_PREFIX "got connection from %s|%u\n", clientAddressString,
            clientPort);
 
     // char receiveBuffer[RECEIVE_BUFFER_SIZE];
@@ -111,20 +112,20 @@ int main(void) {
     //}
 
     // close(clientfd);
-    // printf("tlochat server: closed connection from %s|%u\n",
+    // printf(MSG_PREFIX "closed connection from %s|%u\n",
     // clientAddressString, clientPort);
 
     error = clientHandlersAddClient(&handler, clientfd, clientAddressString,
                                     clientPort);
     if (error) {
-      fprintf(stderr, "tlochat server: clientHandlersAddClient failed\n");
+      fprintf(stderr, MSG_PREFIX "clientHandlersAddClient failed\n");
     }
   }
 
-  printf("tlochat server: received sigint\n");
+  printf(MSG_PREFIX "received sigint\n");
   clientHandlersCleanup(&handler);
   close(serverfd);
 
-  printf("tlochat server: exiting successfully\n");
+  printf(MSG_PREFIX "exiting successfully\n");
   exit(EXIT_SUCCESS);
 }
