@@ -31,8 +31,8 @@ typedef struct Client {
 static void sendToAllClients(ClientHandler *handler, const char *message,
                              int messageLen) {
   pthread_mutex_lock(&handler->clientsMutex);
-  for (size_t i = 0; i < tloDArrayGetSize(&handler->clientPtrs); ++i) {
-    Client **clientPtrPtr = tloDArrayGetMutableElement(&handler->clientPtrs, i);
+  for (size_t i = 0; i < tloDArraySize(&handler->clientPtrs); ++i) {
+    Client **clientPtrPtr = tloDArrayMutableElement(&handler->clientPtrs, i);
     if ((*clientPtrPtr)->state != CLIENT_CLOSED) {
       Client *clientPtr = *clientPtrPtr;
       int numBytesSent = send(clientPtr->fd, message, messageLen, MSG_NOSIGNAL);
@@ -59,9 +59,8 @@ static void *handleClients(void *data) {
       assert(!errno);
     }
 
-    for (size_t i = 0; i < tloDArrayGetSize(&handler->clientPtrs); ++i) {
-      Client **clientPtrPtr =
-          tloDArrayGetMutableElement(&handler->clientPtrs, i);
+    for (size_t i = 0; i < tloDArraySize(&handler->clientPtrs); ++i) {
+      Client **clientPtrPtr = tloDArrayMutableElement(&handler->clientPtrs, i);
       if ((*clientPtrPtr)->state == CLIENT_UNHANDLED) {
         (*clientPtrPtr)->state = CLIENT_BEING_HANDLED;
         clientPtr = *clientPtrPtr;
@@ -145,18 +144,17 @@ static void *cleanClients(void *data) {
       assert(!errno);
     }
 
-    printf(MSG_PREFIX "%zu clients\n", tloDArrayGetSize(&handler->clientPtrs));
+    printf(MSG_PREFIX "%zu clients\n", tloDArraySize(&handler->clientPtrs));
     printf(MSG_PREFIX "cleaning up clients\n");
-    for (size_t i = 0; i < tloDArrayGetSize(&handler->clientPtrs); ++i) {
-      Client **clientPtrPtr =
-          tloDArrayGetMutableElement(&handler->clientPtrs, i);
+    for (size_t i = 0; i < tloDArraySize(&handler->clientPtrs); ++i) {
+      Client **clientPtrPtr = tloDArrayMutableElement(&handler->clientPtrs, i);
       if ((*clientPtrPtr)->state == CLIENT_CLOSED) {
         tloDArrayUnorderedRemove(&handler->clientPtrs, i);
         i--;
         handler->numClosedClients--;
       }
     }
-    printf(MSG_PREFIX "%zu clients\n", tloDArrayGetSize(&handler->clientPtrs));
+    printf(MSG_PREFIX "%zu clients\n", tloDArraySize(&handler->clientPtrs));
     pthread_mutex_unlock(&handler->clientsMutex);
   }
 
