@@ -29,13 +29,14 @@ typedef struct Client {
 #define SEND_BUFFER_SIZE 1024
 
 static void sendToAllClients(ClientHandler *handler, const char *message,
-                             int messageLen) {
+                             size_t messageLen) {
   pthread_mutex_lock(&handler->clientsMutex);
   for (size_t i = 0; i < tloDArraySize(&handler->clientPtrs); ++i) {
     Client **clientPtrPtr = tloDArrayMutableElement(&handler->clientPtrs, i);
     if ((*clientPtrPtr)->state != CLIENT_CLOSED) {
       Client *clientPtr = *clientPtrPtr;
-      int numBytesSent = send(clientPtr->fd, message, messageLen, MSG_NOSIGNAL);
+      ssize_t numBytesSent =
+          send(clientPtr->fd, message, messageLen, MSG_NOSIGNAL);
       if (numBytesSent == -1) {
         perror(MSG_PREFIX "send");
         fprintf(stderr, MSG_PREFIX "failed to send message to %s|%u\n",
@@ -131,8 +132,6 @@ static void *handleClients(void *data) {
   pthread_exit(NULL);
 }
 
-#define IGNORE_OUT_ARG NULL
-
 static void *cleanClients(void *data) {
   ClientHandler *handler = data;
 
@@ -160,9 +159,6 @@ static void *cleanClients(void *data) {
 
   pthread_exit(NULL);
 }
-
-#define DEFAULT_ATTRIBUTES NULL
-#define NO_ARGS NULL
 
 int clientHandlersInit(ClientHandler *handler) {
   assert(handler);
