@@ -10,11 +10,23 @@ A simple chat server.
 
 ## Clone, Build, and Run
 
+Clone into tlochat directory.
+
 ```
-$ git clone --branch develop --recursive <url/to/tlochat.git> # clone into tlochat directory
+$ git clone --branch develop --recursive <url/to/tlochat.git>
+```
+
+Build.
+
+```
 $ mkdir tlochatbuild
 $ cd tlochatbuild
 $ cmake -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=Debug ../tlochat
 $ make
+```
+
+Run.
+
+```
 $ ./tlochat_server
 ```
