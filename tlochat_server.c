@@ -10,6 +10,14 @@
 #include <unistd.h>
 #include "client_handlers.h"
 
+#ifdef __CYGWIN__
+// - in Cygwin, <signal.h> doesn't include prototypes for these functions
+// - without these prototypes, will get -Wimplicit-function-declaration warning
+int sigemptyset(sigset_t *set);
+int sigaction(int sig, const struct sigaction *restrict act,
+              struct sigaction *restrict oact);
+#endif
+
 #define MSG_PREFIX "tlochat server: "
 #define PORT "12345"
 #define MAX_NUM_PENDING_CONNECTIONS 10
