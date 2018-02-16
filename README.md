@@ -28,5 +28,5 @@ $ make
 Run.
 
 ```
-$ ./tlochat_server
+$ ./src/tlochat_server
 ```
