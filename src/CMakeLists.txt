@@ -7,10 +7,10 @@ if ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" OR
 
   if (TLOCHAT_USE_ASAN)
     set(sanitizer_compile_options -fsanitize=address -fsanitize=undefined -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls)
-    set(sanitizer_link_options -fsanitize=address)
+    set(sanitizer_link_options -fsanitize=address -fsanitize=undefined)
   elseif(TLOCHAT_USE_MSAN)
     set(sanitizer_compile_options -fsanitize=memory -fsanitize=undefined -O1 -fno-omit-frame-pointer -fno-optimize-sibling-calls)
-    set(sanitizer_link_options -fsanitize=memory)
+    set(sanitizer_link_options -fsanitize=memory -fsanitize=undefined)
   endif()
 
   if ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
